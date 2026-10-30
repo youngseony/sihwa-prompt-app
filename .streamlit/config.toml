@@ -1,0 +1,11 @@
+# 앱 전체 색 (수채화 용지 + 먹 + 수채 청록). 파일을 고치면 앱을 껐다가 다시 켜야 바뀝니다.
+[theme]
+base = "light"
+backgroundColor = "#FAF6EF"           # 배경: 따뜻한 수채화 용지색
+secondaryBackgroundColor = "#F1EADF"  # 입력칸·상자 배경: 배경보다 한 톤 짙은 용지색
+textColor = "#2D3142"                 # 글자: 먹물 같은 남빛 회색
+primaryColor = "#2F6F7E"              # 강조: 차분한 수채 청록 (선택 표시, 탭 밑줄, 체크칸)
+
+# static/ 폴더의 파일(첫 화면 배경 영상 hero.mp4)을 앱 주소로 내보낸다: /app/static/hero.mp4
+[server]
+enableStaticServing = true
