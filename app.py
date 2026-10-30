@@ -695,25 +695,46 @@ def screen3():
         st.caption(f"{month}월에는 조건에 맞는 시가 없습니다.")
     else:
         # 열 이름은 굵게, 이름과 아래 줄 사이는 좁게 붙인다
-        with st.container(gap=None):
+        with st.container(gap=None, key="poem_head"):
             head = st.columns(widths, gap="xxsmall")
             for col, name in zip(head[1:], ["받은날짜", "제목", "작가", "잘림", "시화", "프롬프트"]):
                 center(col, name, bold=True)  # 열 이름은 모두 가운데 정렬 (값은 제목만 왼쪽)
-            st.markdown("<div style='height:36px'></div>", unsafe_allow_html=True)  # 열 이름과 첫 줄 사이 간격 (구분선은 없다)
-            # 받은날짜와 제목 사이를 넓히려고 제목 버튼을 오른쪽으로 32px 민다
-            st.markdown("<style>[class*='st-key-row']{margin-left:32px}</style>", unsafe_allow_html=True)
-        for p in rows:
-            cols = st.columns(widths, gap="xxsmall")
-            cols[0].checkbox("고르기", key=f"pick{p['id']}", label_visibility="collapsed")
-            center(cols[1], p["받은날짜"][5:])  # 연 · 월은 위의 탭에 있으니 월-일만
-            if p["삭제됨"]:
-                cols[2].write(p["제목"])  # 삭제한 시는 열 수 없다 (되살린 뒤에 연다)
-            else:
-                cols[2].button(p["제목"], key=f"row{p['id']}", on_click=open_poem, args=(p["id"],))
-            center(cols[3], p["작가"])
-            center(cols[4], p["잘림"])
-            center(cols[5], shiwha_label(p))
-            center(cols[6], prompt_label(p))
+            # 열 이름과 첫 줄 사이 간격 (구분선은 없다). 같은 자리에 목록 모양 설정(스타일)도 둔다
+            st.markdown(
+                "<div style='height:36px'></div><style>"
+                ".mob-only{display:none}"
+                # 받은날짜와 제목 사이를 넓히려고 제목 버튼을 오른쪽으로 32px 민다
+                "[class*='st-key-row']{margin-left:32px}"
+                # 휴대폰(폭 640px 이하): 열 이름 줄은 감추고, 한 줄을 [체크 · 날짜와 상태 · 제목] 세 칸으로 줄인다
+                "@media (max-width: 640px){"
+                ".st-key-poem_head{display:none}"
+                ".st-key-poem_rows [data-testid='stHorizontalBlock']{flex-wrap:nowrap !important}"
+                ".st-key-poem_rows [data-testid='stColumn']{min-width:0 !important}"
+                ".st-key-poem_rows [data-testid='stColumn']:nth-child(n+4){display:none !important}"
+                "[class*='st-key-row']{margin-left:6px !important}"
+                ".mob-only{display:block !important;font-size:12px;opacity:.75}"
+                "}</style>",
+                unsafe_allow_html=True,
+            )
+        with st.container(key="poem_rows"):
+            for p in rows:
+                cols = st.columns(widths, gap="xxsmall")
+                cols[0].checkbox("고르기", key=f"pick{p['id']}", label_visibility="collapsed")
+                # 연 · 월은 위의 탭에 있으니 월-일만. 휴대폰에서는 감춘 칸의 내용(시화 · 프롬프트 · 잘림)을 날짜 아래 작은 글씨로 보여 준다
+                status = " · ".join([shiwha_label(p)] + ([prompt_label(p)] if prompt_label(p) != "-" else []) + ([p["잘림"]] if p["잘림"] != "-" else []))
+                cols[1].markdown(
+                    f'<div style="text-align:center">{html.escape(p["받은날짜"][5:])}'
+                    f'<span class="mob-only">{html.escape(status)}</span></div>',
+                    unsafe_allow_html=True,
+                )
+                if p["삭제됨"]:
+                    cols[2].write(p["제목"])  # 삭제한 시는 열 수 없다 (되살린 뒤에 연다)
+                else:
+                    cols[2].button(p["제목"], key=f"row{p['id']}", on_click=open_poem, args=(p["id"],))
+                center(cols[3], p["작가"])
+                center(cols[4], p["잘림"])
+                center(cols[5], shiwha_label(p))
+                center(cols[6], prompt_label(p))
 
 
 # ---- 공통: 맨 위 안내 + 화면 이동 ----
