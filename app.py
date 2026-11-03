@@ -1,9 +1,7 @@
 import csv
-import hmac
 import html
 import io
 import os
-import time
 import zipfile
 from datetime import datetime
 
@@ -15,9 +13,6 @@ from poem_parser import OBJECT_CHAR, parse_file, parse_message
 
 st.set_page_config(page_title="시화 프롬프트 제작")
 
-MAX_WRONG = 5  # 한 접속에서 이만큼 틀리면 잠시 멈춘다
-
-
 def _is_local():
     """내 컴퓨터에서 직접 열었는가 (주소가 localhost일 때). 알 수 없으면 아니라고 본다."""
     try:
@@ -27,42 +22,53 @@ def _is_local():
     return host.split(":")[0] in ("localhost", "127.0.0.1")
 
 
-def require_password():
-    """비밀번호를 맞게 입력하기 전에는 앱의 나머지(시 · 프롬프트)를 보여 주지 않는다.
+def _login_configured():
+    """구글 로그인 설정([auth], Secrets 또는 .streamlit/secrets.toml)이 있는가."""
+    try:
+        return "auth" in st.secrets
+    except Exception:
+        return False
 
-    비밀번호는 환경변수 APP_PASSWORD(.env 또는 Streamlit Cloud의 Secrets)에서 읽는다 (코드에 적지 않음).
-    APP_PASSWORD가 없으면, 내 컴퓨터에서 직접 열 때만 그냥 열리고 그 밖의 주소에서는 열리지 않는다.
+
+def _allowed_emails():
+    """들어올 수 있는 구글 계정 목록. 환경변수 ALLOWED_EMAILS에 쉼표로 적는다 (코드에 적지 않음)."""
+    raw = os.environ.get("ALLOWED_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def require_login():
+    """허락된 구글 계정으로 로그인하기 전에는 앱의 나머지(시 · 프롬프트)를 보여 주지 않는다.
+
+    구글 로그인 설정은 [auth] (.streamlit/secrets.toml 또는 Streamlit Cloud의 Secrets),
+    들어올 계정은 ALLOWED_EMAILS에서 읽는다. 로그인 설정이 없으면, 내 컴퓨터에서 직접 열 때만
+    그냥 열리고 그 밖의 주소에서는 열리지 않는다.
     """
     poem_db.load_env()
-    password = os.environ.get("APP_PASSWORD", "")
-    if st.session_state.get("authed"):
-        return
-    if not password:
+    if not _login_configured():
         if _is_local():
             return
         st.title("시화 프롬프트 제작")
-        st.error("비밀번호가 설정되지 않아 열 수 없습니다. 설정(Secrets)에 APP_PASSWORD를 추가해 주세요.")
+        st.error("구글 로그인이 설정되지 않아 열 수 없습니다. 설정(Secrets)에 [auth]를 추가해 주세요.")
         st.stop()
-    st.title("시화 프롬프트 제작")
-    st.caption("비밀번호를 입력해 주세요.")
-    with st.form("login"):
-        typed = st.text_input("비밀번호", type="password", label_visibility="collapsed", placeholder="비밀번호")
-        pressed = st.form_submit_button("들어가기")
-    wrong = st.session_state.get("wrong", 0)
-    if pressed:
-        if wrong >= MAX_WRONG:
-            time.sleep(10)  # 계속 틀리면 한 번에 10초씩 기다리게 해서 마구 넣어 보기 어렵게 한다
-        if hmac.compare_digest(typed.encode("utf-8"), password.encode("utf-8")):
-            st.session_state.authed = True
-            st.session_state.wrong = 0
-            st.rerun()
-        st.session_state.wrong = wrong + 1
-        time.sleep(1)
-        st.error("비밀번호가 맞지 않습니다.")
-    st.stop()
+    if not st.user.is_logged_in:
+        st.title("시화 프롬프트 제작")
+        st.caption("구글 계정으로 로그인해 주세요.")
+        st.button("구글로 로그인", on_click=st.login, args=["google"])
+        st.stop()
+    email = str(st.user.get("email", "")).lower()
+    verified = st.user.get("email_verified", False)
+    if not (email and verified and email in _allowed_emails()):
+        st.title("시화 프롬프트 제작")
+        st.error("이 계정은 들어올 수 없습니다. 허락된 계정으로 다시 로그인해 주세요.")
+        st.button("로그아웃", on_click=st.logout)
+        st.stop()
 
 
-require_password()
+require_login()
+
+if _login_configured():
+    who = st.user.get("name") or st.user.get("email", "")
+    st.caption(f"{who}님 로그인 중")
 
 # 시 목록은 Supabase의 poems 표에 있다 (poem_db.py). 여기에는 화면 상태만 둔다
 if "screen" not in st.session_state:
