@@ -748,6 +748,6 @@ n3.button("시 목록", key="nav3", on_click=go, args=(3,), use_container_width=
 
 # ---- 맨 아래 저작권 한 줄 ----
 st.caption(
-    '<div style="text-align:right">© 2026 시화 프롬프트 제작 웹앱</div>',
+    '<div style="text-align:right">© 2026 시화 프롬프트 생성 웹앱</div>',
     unsafe_allow_html=True,
 )
