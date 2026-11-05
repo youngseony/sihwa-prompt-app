@@ -33,7 +33,25 @@ def _login_configured():
 def _allowed_emails():
     """들어올 수 있는 구글 계정 목록. 환경변수 ALLOWED_EMAILS에 쉼표로 적는다 (코드에 적지 않음)."""
     raw = os.environ.get("ALLOWED_EMAILS", "")
-    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+    return {e.strip().lower() for e in raw.split(",") if e.strip()} | _admin_emails()  # 관리자는 항상 들어올 수 있다
+
+
+def _admin_emails():
+    """관리자 메일 목록. 설정(st.secrets)의 ADMIN_EMAILS에서 읽는다 (쉼표로 이은 글 또는 목록 모두 가능)."""
+    try:
+        raw = st.secrets.get("ADMIN_EMAILS", "")
+    except Exception:
+        return set()
+    items = raw.split(",") if isinstance(raw, str) else list(raw)
+    return {str(e).strip().lower() for e in items if str(e).strip()}
+
+
+def is_admin():
+    """지금 들어온 사람이 관리자인가. 로그인한 구글 메일(확인된 것만)이 관리자 목록에 있어야 한다."""
+    if not _login_configured() or not st.user.is_logged_in:
+        return False
+    email = str(st.user.get("email", "")).lower()
+    return bool(email) and bool(st.user.get("email_verified", False)) and email in _admin_emails()
 
 
 def require_login():
@@ -159,6 +177,12 @@ def load_or_stop():
     except poem_db.SupabaseError as e:
         st.error(str(e))
         st.stop()
+
+
+# ---- 화면 4 · 관리 (관리자만) ----
+def screen4():
+    """관리 화면. 관리자만 열 수 있고, 관리자가 아니면 이 함수는 실행되지 않는다."""
+    st.write("관리자만 보는 화면입니다")
 
 
 # ---- 화면 1 · 시 넣기 ----
@@ -749,8 +773,17 @@ n1.button("시 넣기", key="nav1", on_click=go, args=(1,), use_container_width=
 n2.button("시 한 편", key="nav2", on_click=go, args=(2,), use_container_width=True)
 n3.button("시 목록", key="nav3", on_click=go, args=(3,), use_container_width=True)
 
+admin = is_admin()
+if admin:
+    st.sidebar.button("관리", key="nav_admin", on_click=go, args=(4,), use_container_width=True)
+elif st.session_state.screen == 4:
+    st.session_state.screen = 3  # 관리자가 아니면 관리 화면 대신 시 목록으로
 
-{1: screen1, 2: screen2, 3: screen3}[st.session_state.screen]()
+
+screens = {1: screen1, 2: screen2, 3: screen3}
+if admin:
+    screens[4] = screen4  # 관리자일 때만 관리 화면을 화면 목록에 올린다
+screens[st.session_state.screen]()
 
 # ---- 맨 아래 저작권 한 줄 ----
 st.caption(
